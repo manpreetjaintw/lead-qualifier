@@ -34,6 +34,15 @@ npm run dev            # http://localhost:3000, then click "Try with sample data
 
 No database or API keys are needed. Without `DATABASE_URL`, saved lists and the lookup cache live in memory.
 
+### Run with Docker (app + Postgres)
+
+```bash
+docker compose up --build      # http://localhost:3000
+docker compose down            # stop (add -v to also delete saved lists)
+```
+
+This builds a slim Node 20 image (Next.js standalone output; tests run during the build) and starts it next to Postgres 16. Saved lists and the 7-day lookup cache persist in the `pgdata` volume. To run the app container alone, in memory, use `docker build -t lead-qualifier . && docker run -p 3000:3000 lead-qualifier`.
+
 ### Optional: persist to Postgres (Neon)
 
 ```bash
