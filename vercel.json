@@ -1,0 +1,4 @@
+{
+  "regions": ["iad1"],
+  "functions": { "src/app/api/qualify/route.ts": { "maxDuration": 30 } }
+}

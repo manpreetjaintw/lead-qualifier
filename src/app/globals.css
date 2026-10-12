@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 220 20% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --border: 220 13% 90%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 44%;
+  --primary: 243 75% 59%;
+  --primary-foreground: 0 0% 100%;
+  --hot: 152 69% 31%;
+  --hot-bg: 149 80% 94%;
+  --warm: 32 95% 40%;
+  --warm-bg: 48 96% 91%;
+  --cold: 220 9% 46%;
+  --cold-bg: 220 14% 94%;
+  --bad: 0 72% 46%;
+  --bad-bg: 0 86% 96%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 224 30% 7%;
+    --foreground: 210 20% 96%;
+    --card: 224 25% 10%;
+    --border: 220 16% 20%;
+    --muted: 222 20% 14%;
+    --muted-foreground: 218 11% 65%;
+    --primary: 243 85% 68%;
+    --hot: 150 60% 55%;
+    --hot-bg: 152 50% 14%;
+    --warm: 40 95% 60%;
+    --warm-bg: 36 60% 15%;
+    --cold: 218 11% 65%;
+    --cold-bg: 222 18% 17%;
+    --bad: 0 85% 66%;
+    --bad-bg: 0 50% 16%;
+  }
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+}
+
+input[type="range"] {
+  @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary;
+}
