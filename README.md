@@ -71,7 +71,7 @@ npm run typecheck
 | **Source** | [OpenStreetMap](https://www.openstreetmap.org/copyright) through the public Nominatim and Overpass APIs. It is open data (ODbL) and both services permit automated use within their usage policies. |
 | **Schedule** | One run about 10 seconds after the server starts, then every 30 minutes (`SCRAPE_INTERVAL_MINUTES`). Runs never overlap. |
 | **What it collects** | Every *tracked search* (an industry plus a place). Six are created on first start; add or remove them on the **Scraper** page or through `/api/searches`. |
-| **When a source is busy** | The public Overpass servers are shared and sometimes answer 429/504 or time out. Each search tries two endpoints, up to three times. A search that still fails is listed with its error in the run history, keeps the companies it already has, and goes first on the next run. |
+| **When a source is busy** | The public Overpass servers are shared and sometimes answer 429/504 or time out. Each search tries three endpoints, up to three times. A search that still fails is listed with its error in the run history, keeps the companies it already has, and goes first on the next run. |
 | **Politeness** | One Overpass query at a time with a pause between searches, an honest user agent, `robots.txt` honoured, one website fetch per domain per 7 days. |
 
 Seventeen industries are supported out of the box (`src/lib/scraper/industries.ts`); adding one is a single line mapping a label to OpenStreetMap tags.

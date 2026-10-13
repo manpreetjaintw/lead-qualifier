@@ -1,4 +1,5 @@
 import "server-only";
+import "./outbound";
 import { resolveMx } from "node:dns/promises";
 import * as cheerio from "cheerio";
 import type { NetworkCheck, WebsiteCheck } from "./types";

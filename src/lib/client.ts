@@ -34,7 +34,7 @@ export function describeRunError(error: string): string {
     ? "the data source took too long to answer"
     : /responded (429|5\d\d)|cooling off/i.test(cause)
       ? "the data source was busy"
-      : /fetch failed|network|ENOTFOUND|ECONN/i.test(cause)
+      : /fetch failed|could not be reached|network|ENOTFOUND|ECONN|ETIMEDOUT/i.test(cause)
         ? "the data source could not be reached"
         : /^Skipped/i.test(cause)
           ? "the run ran out of time before reaching it"

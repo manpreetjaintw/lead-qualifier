@@ -1,3 +1,4 @@
+import "../outbound";
 import type { Industry } from "./industries";
 import { parseYear } from "../pipeline/normalize";
 
@@ -7,7 +8,11 @@ import { parseYear } from "../pipeline/normalize";
  * identify yourself, one request at a time, and keep the volume low. This module does all three.
  */
 export const USER_AGENT = "LeadQualifierBot/1.0 (+https://github.com/manpreetjaintw/lead-qualifier)";
-const OVERPASS_ENDPOINTS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+];
 const MAX_RESULTS = 500;
 
 export interface Place {
@@ -55,6 +60,12 @@ async function fetchJson(url: string, init: RequestInit, timeoutMs: number): Pro
     const res = await fetch(url, { ...init, headers: { "user-agent": USER_AGENT, accept: "application/json", ...init.headers }, signal: ctrl.signal });
     if (!res.ok) throw new Error(`${new URL(url).host} responded ${res.status}`);
     return await res.json();
+  } catch (e) {
+    // fetch() hides the real reason in `cause`; keep it so a failed run says why, not just "fetch failed".
+    const cause = (e as { cause?: { code?: string; message?: string; errors?: { code?: string }[] } }).cause;
+    const code = cause?.code ?? cause?.errors?.map((x) => x.code).filter(Boolean).join("/") ?? cause?.message;
+    if (e instanceof Error && e.name !== "AbortError" && code) throw new Error(`${new URL(url).host} could not be reached (${code})`);
+    throw e;
   } finally {
     clearTimeout(t);
   }
