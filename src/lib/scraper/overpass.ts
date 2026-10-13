@@ -6,7 +6,7 @@ import { parseYear } from "../pipeline/normalize";
  * Both are open data under the ODbL and permit automated use within their usage policies:
  * identify yourself, one request at a time, and keep the volume low. This module does all three.
  */
-export const USER_AGENT = "LeadQualifierBot/1.0 (+https://github.com/lead-qualifier; OpenStreetMap data, ODbL)";
+export const USER_AGENT = "LeadQualifierBot/1.0 (+https://github.com/manpreetjaintw/lead-qualifier)";
 const OVERPASS_ENDPOINTS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
 const MAX_RESULTS = 500;
 
@@ -60,27 +60,57 @@ async function fetchJson(url: string, init: RequestInit, timeoutMs: number): Pro
   }
 }
 
-/** Resolve "Austin, TX" to an OpenStreetMap area. Returns null when the place is unknown. */
-export async function geocode(location: string): Promise<Place | null> {
+// Overpass areas only exist for relations and closed ways, so a bare point cannot be searched.
+const areaId = (type: string, id: number) => (/^r/i.test(type) ? 3_600_000_000 : 2_400_000_000) + id;
+const isArea = (type: string | undefined) => /^[rw]/i.test(type ?? "");
+
+async function nominatim(location: string): Promise<Place | null> {
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&q=${encodeURIComponent(location)}`;
-  const results = (await fetchJson(url, {}, 15_000)) as {
-    osm_type: string;
-    osm_id: number;
-    name?: string;
-    display_name: string;
-    address?: Record<string, string>;
-  }[];
-  // Overpass areas only exist for relations and closed ways, so a bare point cannot be searched.
+  const results = (await fetchJson(url, {}, 15_000)) as { osm_type: string; osm_id: number; name?: string; display_name: string; address?: Record<string, string> }[];
   const hit = results.find((r) => r.osm_type === "relation") ?? results.find((r) => r.osm_type === "way");
   if (!hit) return null;
   const a = hit.address ?? {};
   return {
-    areaId: (hit.osm_type === "relation" ? 3_600_000_000 : 2_400_000_000) + hit.osm_id,
+    areaId: areaId(hit.osm_type, hit.osm_id),
     displayName: hit.display_name,
     city: hit.name ?? a.city ?? a.town ?? a.village ?? location,
     state: a.state ?? "",
     country: (a.country_code ?? "").toUpperCase(),
   };
+}
+
+async function photon(location: string): Promise<Place | null> {
+  const url = `https://photon.komoot.io/api/?limit=10&layer=city&layer=county&layer=state&q=${encodeURIComponent(location)}`;
+  const json = (await fetchJson(url, {}, 15_000)) as { features?: { properties: Record<string, string | number | undefined> }[] };
+  const hit = (json.features ?? []).map((f) => f.properties).find((p) => isArea(String(p.osm_type ?? "")) && typeof p.osm_id === "number");
+  if (!hit) return null;
+  const name = String(hit.name ?? location);
+  return {
+    areaId: areaId(String(hit.osm_type), hit.osm_id as number),
+    displayName: [name, hit.state, hit.country].filter(Boolean).join(", "),
+    city: name,
+    state: String(hit.state ?? ""),
+    country: String(hit.countrycode ?? "").toUpperCase(),
+  };
+}
+
+/**
+ * Resolve "Austin, Texas" to an OpenStreetMap area. Returns null when the place is unknown.
+ * Nominatim is asked first; it turns away some hosting providers' addresses, so Photon (another
+ * public geocoder over the same data) is the fallback. Throws only when neither can be reached.
+ */
+export async function geocode(location: string): Promise<Place | null> {
+  let failure: unknown;
+  for (const lookup of [nominatim, photon]) {
+    try {
+      const place = await lookup(location);
+      if (place) return place;
+    } catch (e) {
+      failure = e;
+    }
+  }
+  if (failure) throw failure instanceof Error ? failure : new Error(String(failure));
+  return null;
 }
 
 const esc = (s: string) => s.replace(/[\\"]/g, "\\$&");

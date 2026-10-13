@@ -22,39 +22,55 @@ export const STALE_RUN_MS = 25 * 60 * 1000;
 /** Stop starting new searches after this long, so one slow run never overlaps the next scheduled one. */
 const RUN_BUDGET_MS = 18 * 60 * 1000;
 
-/** Searches created on first start so the database is useful before anyone configures anything. */
-const DEFAULT_SEARCHES: [industry: string, location: string][] = [
-  ["accounting", "Austin, Texas"],
-  ["dental", "Austin, Texas"],
-  ["auto-repair", "Denver, Colorado"],
-  ["veterinary", "Denver, Colorado"],
-  ["legal", "Columbus, Ohio"],
-  ["insurance", "Nashville, Tennessee"],
+/**
+ * Searches created on first start so the database is useful before anyone configures anything.
+ * Their areas are resolved ahead of time, so first start does not depend on a geocoder being reachable.
+ */
+const us = (industry: string, city: string, state: string, relationId: number) => ({
+  industry,
+  location: `${city}, ${state}`,
+  areaId: 3_600_000_000 + relationId,
+  displayName: `${city}, ${state}, United States`,
+  city,
+  state,
+  country: "US",
+});
+const DEFAULT_SEARCHES = [
+  us("accounting", "Austin", "Texas", 113314),
+  us("dental", "Austin", "Texas", 113314),
+  us("auto-repair", "Denver", "Colorado", 1411339),
+  us("veterinary", "Denver", "Colorado", 1411339),
+  us("legal", "Columbus", "Ohio", 182706),
+  us("insurance", "Nashville", "Tennessee", 197472),
 ];
-
-function seedList(): [string, string][] {
-  const raw = process.env.SCRAPER_SEARCHES;
-  if (raw === undefined) return DEFAULT_SEARCHES;
-  // Format: "plumbing@Austin, Texas; dental@Denver, Colorado". Empty disables seeding.
-  return raw.split(";").map((p) => p.split("@").map((s) => s.trim()) as [string, string]).filter(([i, l]) => industryById(i) && l);
-}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const g = globalThis as typeof globalThis & { __scrapeInFlight?: Promise<ScrapeRun> | null };
 
-async function ensureSeeded(): Promise<Search[]> {
+/** Create the starting searches when none exist. Returns the searches plus anything that went wrong. */
+async function ensureSeeded(): Promise<{ searches: Search[]; errors: string[] }> {
   const existing = await listSearches();
-  if (existing.length) return existing;
-  for (const [industry, location] of seedList()) {
-    try {
-      const place = await geocode(location);
-      if (place) await addSearch({ industry, location, ...place });
-    } catch {
-      /* geocoder unreachable: try again on the next run */
+  if (existing.length) return { searches: existing, errors: [] };
+  const errors: string[] = [];
+  const raw = process.env.SCRAPER_SEARCHES;
+  if (raw === undefined) {
+    for (const seed of DEFAULT_SEARCHES) await addSearch(seed);
+  } else {
+    // Format: "plumbing@Austin, Texas; dental@Denver, Colorado". Empty creates none.
+    for (const [industry, location] of raw.split(";").map((p) => p.split("@").map((x) => x.trim())).filter(([i, l]) => i && l)) {
+      try {
+        if (!industryById(industry)) throw new Error(`unknown industry "${industry}"`);
+        const place = await geocode(location);
+        if (!place) throw new Error("place not found");
+        await addSearch({ industry, location, ...place });
+      } catch (e) {
+        errors.push(`Could not set up the search ${industry} in ${location}: ${e instanceof Error ? e.message : e}`);
+      }
+      await sleep(1100); // public geocoders allow about one request per second
     }
-    await sleep(1100); // Nominatim allows one request per second
   }
-  return listSearches();
+  if (errors.length) console.error("[scraper] seeding problems:", errors);
+  return { searches: await listSearches(), errors };
 }
 
 /** Homepage check and MX lookup for one lead; contact details found on the site fill gaps in the listing. */
@@ -155,7 +171,7 @@ async function execute(run: ScrapeRun, all: Search[]): Promise<ScrapeRun> {
     await saveRunProgress(run).catch(() => {});
     if (i < searches.length - 1) await sleep(PAUSE_BETWEEN_SEARCHES_MS);
   }
-  run.status = failed === 0 ? "success" : failed < searches.length ? "partial" : "failed";
+  run.status = failed === 0 && !run.errors.length ? "success" : failed < searches.length ? "partial" : "failed";
   run.finishedAt = new Date().toISOString();
   await saveRunProgress(run);
   return run;
@@ -174,8 +190,9 @@ export async function startScrape(trigger: RunTrigger): Promise<{ run: ScrapeRun
   const created = new Promise<ScrapeRun>((r) => (resolveRun = r));
   const done = (async () => {
     await failStaleRuns(STALE_RUN_MS);
-    const searches = await ensureSeeded();
+    const { searches, errors } = await ensureSeeded();
     const run = await createRun(trigger, searches.length);
+    run.errors.push(...errors);
     resolveRun(run);
     return execute(run, searches);
   })();
