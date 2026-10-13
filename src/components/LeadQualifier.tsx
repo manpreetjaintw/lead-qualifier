@@ -7,7 +7,7 @@ import { guessMapping } from "@/lib/mapping";
 import { prepare, scoreAll, computeStats, emailDomain } from "@/lib/pipeline";
 import { PRESETS, type PresetId } from "@/lib/pipeline/score";
 import { SAMPLE_CSV_URL } from "@/lib/sample";
-import { AppShell } from "./AppShell";
+import { PageHeader } from "./AppShell";
 import { Stepper } from "./Stepper";
 import { UploadStep } from "./UploadStep";
 import { MapStep } from "./MapStep";
@@ -117,17 +117,11 @@ export function LeadQualifier() {
   const step = phase === "upload" ? 0 : phase === "map" ? 1 : 2;
 
   return (
-    <AppShell>
-      <header className="border-b border-border bg-card px-6 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold">Lead Qualifier</h1>
-            <p className="text-sm text-muted-foreground">Dedupe, verify and rank leads before you spend a credit.</p>
-          </div>
-          <Stepper current={step} />
-        </div>
-      </header>
-      <div className="p-6">
+    <>
+      <PageHeader title="Lead Qualifier" subtitle="Dedupe, verify and rank your own lead lists before you spend a credit.">
+        <Stepper current={step} />
+      </PageHeader>
+      <div>
         {phase === "upload" && (
           <UploadStep
             error={error}
@@ -167,6 +161,6 @@ export function LeadQualifier() {
           />
         )}
       </div>
-    </AppShell>
+    </>
   );
 }

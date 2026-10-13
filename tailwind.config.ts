@@ -10,6 +10,7 @@ const config: Config = {
         foreground: "hsl(var(--foreground))",
         muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
         primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
+        accent: "hsl(var(--accent))",
         card: "hsl(var(--card))",
         hot: { DEFAULT: "hsl(var(--hot))", bg: "hsl(var(--hot-bg))" },
         warm: { DEFAULT: "hsl(var(--warm))", bg: "hsl(var(--warm-bg))" },

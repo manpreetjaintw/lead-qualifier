@@ -1,58 +1,60 @@
-import { Building2, Users, UsersRound, Newspaper, Mail, ShieldCheck, Linkedin, ScanSearch, LineChart, Sparkles, HelpCircle } from "lucide-react";
+"use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Building2, ListChecks, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { label: "Companies", icon: Building2 },
-  { label: "Persons", icon: Users },
-  { label: "Teams", icon: UsersRound },
-  { label: "AI News", icon: Newspaper },
-  { label: "Email Generator", icon: Mail },
-  { label: "Validators", icon: ShieldCheck },
-  { label: "Lead Qualifier", icon: Sparkles, active: true, badge: "NEW" },
-  { label: "LinkedIn Messenger", icon: Linkedin },
-  { label: "AI Web Scanner", icon: ScanSearch, badge: "SOON" },
-  { label: "Financial Analysis", icon: LineChart, badge: "SOON" },
+  { href: "/", label: "Company Finder", icon: Building2 },
+  { href: "/qualifier", label: "Lead Qualifier", icon: ListChecks },
+  { href: "/scraper", label: "Scraper", icon: RefreshCw },
 ];
 
-/** Mirrors the SaaSquatch app navigation so the module reads as part of the product. */
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   return (
-    <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card px-3 py-5 lg:flex">
-        <div className="mb-6 flex items-center gap-2 px-2">
-          <div className="grid h-8 w-8 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">SQ</div>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold">SaaSquatch</div>
-            <div className="text-[11px] text-muted-foreground">Leads</div>
-          </div>
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-20 border-b border-border bg-card">
+        <div className="mx-auto flex h-[68px] max-w-[1600px] items-center gap-4 px-5 sm:px-10">
+          <Link href="/" className="shrink-0 text-xl font-bold tracking-tight">
+            SaaSquatch <span className="text-primary">Leads</span>
+          </Link>
+          <nav className="ml-auto flex items-center gap-1 sm:gap-2" aria-label="Main">
+            {NAV.map(({ href, label, icon: Icon }) => {
+              const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  aria-label={label}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                    active ? "bg-brand text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Icon className="h-4 w-4" aria-hidden />
+                  <span className="hidden md:inline">{label}</span>
+                </Link>
+              );
+            })}
+          </nav>
         </div>
-        <nav className="flex flex-1 flex-col gap-0.5" aria-label="Main">
-          {NAV.map(({ label, icon: Icon, active, badge }) => (
-            <div
-              key={label}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm",
-                active ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground",
-                !active && "cursor-not-allowed opacity-70",
-              )}
-              title={active ? undefined : "Part of the main SaaSquatch app"}
-            >
-              <Icon className="h-4 w-4" aria-hidden />
-              <span className="flex-1">{label}</span>
-              {badge && (
-                <span className={cn("rounded px-1.5 py-px text-[9px] font-semibold tracking-wide", badge === "NEW" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-                  {badge}
-                </span>
-              )}
-            </div>
-          ))}
-        </nav>
-        <div className="flex items-center gap-2 px-2.5 text-xs text-muted-foreground">
-          <HelpCircle className="h-3.5 w-3.5" /> Prototype module for SaaSquatch Leads
-        </div>
-      </aside>
-      <main className="min-w-0 flex-1">{children}</main>
+      </header>
+      <main className="mx-auto w-full max-w-[1600px] px-5 py-8 sm:px-10 sm:py-10">{children}</main>
+    </div>
+  );
+}
+
+/** Title block shared by every page, with room for an action or status on the right. */
+export function PageHeader({ title, subtitle, children }: { title: string; subtitle: string; children?: React.ReactNode }) {
+  return (
+    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+        <p className="mt-1 text-muted-foreground">{subtitle}</p>
+      </div>
+      {children}
     </div>
   );
 }

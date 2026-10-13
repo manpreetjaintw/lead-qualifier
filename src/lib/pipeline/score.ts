@@ -48,6 +48,13 @@ const CATEGORY_MAX: Record<PresetId, Record<Category, number>> = {
   b2b: { contact: 35, fit: 33, signals: 20, quality: 12 },
 };
 
+/**
+ * Best achievable points for a company found in a public listing. Listings never carry a contact's
+ * job title, headcount or revenue, so those are left out of the ceiling: a scraped company is ranked
+ * against the best possible scraped company, not against a fully enriched CRM record.
+ */
+export const LISTING_MAX: Record<Category, number> = { contact: 23, fit: 25, signals: 16, quality: 0 };
+
 /** Raw, unweighted signals. Pure: runs on the server and in the browser for instant re-scoring. */
 export function signals(lead: Lead, c: Checks, preset: Preset): Reason[] {
   const r: Reason[] = [];
@@ -122,8 +129,8 @@ export function tierFor(score: number): Tier {
   return score >= 70 ? "hot" : score >= 40 ? "warm" : "cold";
 }
 
-export function scoreLead(lead: Lead, checks: Checks, preset: Preset, weights = preset.weights): ScoredLead {
-  const max = (Object.keys(weights) as Category[]).reduce((s, c) => s + CATEGORY_MAX[preset.id][c] * weights[c], 0);
+export function scoreLead(lead: Lead, checks: Checks, preset: Preset, weights = preset.weights, ceiling = CATEGORY_MAX[preset.id]): ScoredLead {
+  const max = (Object.keys(weights) as Category[]).reduce((s, c) => s + ceiling[c] * weights[c], 0);
   const scale = max > 0 ? 100 / max : 0;
   const reasons = signals(lead, checks, preset)
     .map((x) => ({ ...x, points: Math.round(x.points * weights[x.category] * scale) }))

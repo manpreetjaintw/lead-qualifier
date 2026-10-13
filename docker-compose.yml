@@ -1,13 +1,14 @@
-# Lead Qualifier + Postgres 16 (stands in for Neon locally).
-#   docker compose up --build        -> http://localhost:3000
-# Saved lists and the lookup cache persist in the "pgdata" volume.
+# SaaSquatch Leads (Company Finder + Lead Qualifier) + Postgres 16.
+#   docker compose up --build        -> http://localhost:3001 (host port set below)
+# Companies, tracked searches, saved lists and the lookup cache persist in the "pgdata" volume.
 services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       DATABASE_URL: postgres://leads:leads@db:5432/leads
+      SCRAPE_INTERVAL_MINUTES: "30"
     depends_on:
       db:
         condition: service_healthy

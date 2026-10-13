@@ -12,10 +12,13 @@ import type { RunStats, ScoredLead } from "../types";
 let db: PostgresJsDatabase<typeof schema> | null = null;
 let ready: Promise<void> | null = null;
 
-function getDb() {
+/** Resolves once the tables exist. Await it before the first query of a request. */
+export const dbReady = () => ready ?? Promise.resolve();
+
+export function getDb() {
   if (!process.env.DATABASE_URL) return null;
   if (!db) {
-    const client = postgres(process.env.DATABASE_URL, { max: 1, prepare: false, idle_timeout: 20 });
+    const client = postgres(process.env.DATABASE_URL, { max: 5, prepare: false, idle_timeout: 20, onnotice: () => {} });
     db = drizzle(client, { schema });
     ready = ensureSchema(client);
   }
@@ -28,6 +31,11 @@ async function ensureSchema(client: postgres.Sql) {
   await client`create table if not exists leads (id text not null, run_id text not null references runs(id) on delete cascade, score integer not null, tier text not null, data jsonb not null)`;
   await client`create index if not exists leads_run_idx on leads(run_id, score desc)`;
   await client`create table if not exists lookup_cache (key text primary key, value jsonb not null, checked_at timestamptz not null default now())`;
+  await client`create table if not exists searches (id text primary key, industry text not null, location text not null, area_id bigint not null, display_name text not null, city text not null, state text not null, country text not null, created_at timestamptz not null default now(), last_run_at timestamptz, last_count integer, last_error text)`;
+  await client`create table if not exists companies (id text primary key, name text not null, industry text not null, category text not null, website text not null, domain text not null, email text not null, email_status text not null, phone text not null, address text not null, city text not null, state text not null, postcode text not null, country text not null, lat double precision, lon double precision, founded_year integer, opening_hours text not null, socials jsonb not null, site jsonb, score integer not null, tier text not null, reasons jsonb not null, search_id text not null, source_url text not null, first_seen timestamptz not null default now(), last_seen timestamptz not null default now())`;
+  await client`create index if not exists companies_score_idx on companies(score desc)`;
+  await client`create index if not exists companies_industry_idx on companies(industry, city)`;
+  await client`create table if not exists scrape_runs (id text primary key, trigger text not null, status text not null, started_at timestamptz not null default now(), finished_at timestamptz, searches integer not null default 0, found integer not null default 0, added integer not null default 0, refreshed integer not null default 0, errors jsonb not null)`;
 }
 
 export const storageMode = () => (process.env.DATABASE_URL ? "postgres" : "memory");

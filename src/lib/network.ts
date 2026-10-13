@@ -6,6 +6,7 @@ import { withTimeout } from "./utils";
 import { DEMO_NETWORK } from "./sample";
 import { cached } from "./cache";
 import { FREE_EMAIL_DOMAINS } from "./pipeline/lists";
+import { extractContacts } from "./scraper/contacts";
 
 const UA = "LeadQualifierBot/1.0 (+https://github.com/lead-qualifier; respects robots.txt)";
 const DNS_TIMEOUT = 2500;
@@ -67,8 +68,9 @@ async function robotsAllows(origin: string): Promise<boolean> {
   }
 }
 
-export function parseHomepage(html: string): Omit<WebsiteCheck, "status"> {
+export function parseHomepage(html: string, pageUrl = "http://localhost/"): Omit<WebsiteCheck, "status"> & { contactUrl?: string } {
   const $ = cheerio.load(html);
+  const contacts = extractContacts($, pageUrl);
   const text = $("body").text().replace(/\s+/g, " ");
   const hrefs = $("a[href]").map((_, a) => String($(a).attr("href")).toLowerCase()).get();
   const socials = [
@@ -91,6 +93,9 @@ export function parseHomepage(html: string): Omit<WebsiteCheck, "status"> {
     copyrightYear: years.length ? Math.max(...years) : undefined,
     sinceYear: since ? +since[1] : undefined,
     hiring,
+    emails: contacts.emails,
+    phones: contacts.phones,
+    contactUrl: contacts.contactUrl,
   };
 }
 
@@ -101,7 +106,21 @@ export async function checkWebsite(domain: string): Promise<WebsiteCheck> {
       const res = await get(origin);
       if (res.status >= 500) continue;
       const html = (await res.text()).slice(0, 500_000);
-      return { status: res.ok ? "live" : "dead", ...parseHomepage(html) };
+      const { contactUrl, ...page } = parseHomepage(html, res.url || origin);
+      // Many small-business sites only publish an address on their contact page: follow one link, same host.
+      if (res.ok && !page.emails?.length && contactUrl) {
+        try {
+          const contact = await get(contactUrl);
+          if (contact.ok) {
+            const more = extractContacts(cheerio.load((await contact.text()).slice(0, 500_000)), contactUrl);
+            page.emails = more.emails;
+            page.phones = [...new Set([...(page.phones ?? []), ...more.phones])].slice(0, 3);
+          }
+        } catch {
+          /* the homepage result still stands */
+        }
+      }
+      return { status: res.ok ? "live" : "dead", ...page };
     } catch (e) {
       const cause = (e as { cause?: { code?: string } }).cause?.code;
       if (cause === "ENOTFOUND" && (await dnsHealthy())) return { status: "dead", socials: [] };

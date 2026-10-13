@@ -68,6 +68,9 @@ export interface WebsiteCheck {
   copyrightYear?: number;
   sinceYear?: number;
   hiring?: boolean;
+  /** Contact details published on the homepage or contact page. */
+  emails?: string[];
+  phones?: string[];
 }
 
 export interface NetworkCheck {

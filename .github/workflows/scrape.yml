@@ -1,0 +1,16 @@
+name: Scheduled scrape
+# Calls the backend every 30 minutes. On a host that sleeps when idle (Render's free plan) the in-app
+# timer stops with it, so this wakes the service and starts a run. A run already in progress is reused.
+# Set the repository variable BACKEND_URL (Settings > Secrets and variables > Actions > Variables).
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    if: vars.BACKEND_URL != ''
+    steps:
+      - name: Start a scrape run
+        run: curl --fail --silent --show-error --max-time 120 --retry 3 --retry-delay 20 --retry-all-errors -X POST "${{ vars.BACKEND_URL }}/api/scraper/run"

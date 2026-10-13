@@ -1,0 +1,21 @@
+# Render Blueprint: the always-on backend (API + 30-minute scraper) and its Postgres database.
+# In Render: New > Blueprint > pick this repository. The Vercel deployment serves the UI and forwards
+# /api calls here (set BACKEND_URL on Vercel to this service's URL).
+services:
+  - type: web
+    name: saasquatch-leads
+    runtime: docker
+    plan: free # the free plan sleeps when idle; see README "Deploying" for what that means for the schedule
+    healthCheckPath: /api/runs
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: saasquatch-leads-db
+          property: connectionString
+      - key: SCRAPE_INTERVAL_MINUTES
+        value: "30"
+
+databases:
+  - name: saasquatch-leads-db
+    plan: free
+    postgresMajorVersion: "16"

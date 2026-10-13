@@ -1,5 +1,5 @@
-import { LeadQualifier } from "@/components/LeadQualifier";
+import { CompanyFinder } from "@/components/CompanyFinder";
 
 export default function Page() {
-  return <LeadQualifier />;
+  return <CompanyFinder />;
 }
