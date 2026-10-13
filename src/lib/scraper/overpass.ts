@@ -10,6 +10,7 @@ import { parseYear } from "../pipeline/normalize";
 export const USER_AGENT = "LeadQualifierBot/1.0 (+https://github.com/manpreetjaintw/lead-qualifier)";
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
 ];
@@ -169,32 +170,49 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const ATTEMPT_TIMEOUT_MS = 70_000;
 const ROUNDS = 3;
 const COOL_OFF_MS = 10 * 60_000;
-/** Endpoints that just timed out are skipped for a while instead of stalling every remaining search. */
+const REFUSED_COOL_OFF_MS = 6 * 60 * 60_000;
+/** Endpoints that just failed are skipped for a while instead of stalling every remaining search. */
 const coolingOff = new Map<string, number>();
+/** The endpoint that answered last is asked first next time. */
+let preferred: string | undefined;
+
+const available = () => {
+  const open = OVERPASS_ENDPOINTS.filter((e) => (coolingOff.get(e) ?? 0) <= Date.now());
+  return preferred && open.includes(preferred) ? [preferred, ...open.filter((e) => e !== preferred)] : open;
+};
 
 /**
- * Run one Overpass query. The public instances are shared and often busy (HTTP 429/504), so each
- * endpoint is tried in turn, with a pause before a second round, before the search is reported as failed.
- * A failed search is simply retried on the next scheduled run.
+ * Run one Overpass query. The public instances are shared: they are often busy (HTTP 429/504), and
+ * some refuse connections from cloud hosting providers outright. Each endpoint is tried in turn, for
+ * up to three rounds. One that timed out is rested for 10 minutes, one that refused the connection
+ * for 6 hours. A search that still fails is simply retried on the next scheduled run.
  */
 export async function fetchListings(place: Place, industry: Industry): Promise<Listing[]> {
   const body = `data=${encodeURIComponent(buildQuery(place.areaId, industry))}`;
-  let lastError: unknown = new Error("All Overpass endpoints are cooling off after timeouts");
+  let lastError: unknown = new Error("Every Overpass endpoint is resting after recent failures");
   for (let round = 0; round < ROUNDS; round++) {
+    const endpoints = available();
+    if (!endpoints.length) break;
     if (round > 0) await sleep(20_000);
-    for (const endpoint of OVERPASS_ENDPOINTS) {
-      if ((coolingOff.get(endpoint) ?? 0) > Date.now()) continue;
+    for (const endpoint of endpoints) {
       try {
         const json = (await fetchJson(endpoint, { method: "POST", body, headers: { "content-type": "application/x-www-form-urlencoded" } }, ATTEMPT_TIMEOUT_MS)) as {
           elements?: OsmElement[];
           remark?: string;
         };
         if (json.remark && !json.elements?.length) throw new Error(`Overpass: ${json.remark}`);
+        preferred = endpoint;
         return (json.elements ?? []).map((el) => parseElement(el, industry, place)).filter((l): l is Listing => l !== null);
       } catch (e) {
+        const host = new URL(endpoint).host;
         const timedOut = e instanceof Error && e.name === "AbortError";
+        const refused = e instanceof Error && /ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ENETUNREACH/.test(e.message);
         if (timedOut) coolingOff.set(endpoint, Date.now() + COOL_OFF_MS);
-        lastError = timedOut ? new Error(`${new URL(endpoint).host} did not answer within ${ATTEMPT_TIMEOUT_MS / 1000}s`) : e;
+        if (refused) coolingOff.set(endpoint, Date.now() + REFUSED_COOL_OFF_MS);
+        // A refusal is the least useful thing to report when another endpoint failed for a more telling reason.
+        if (!refused || !(lastError instanceof Error) || /resting/.test(lastError.message)) {
+          lastError = timedOut ? new Error(`${host} did not answer within ${ATTEMPT_TIMEOUT_MS / 1000}s`) : e;
+        }
       }
     }
   }
